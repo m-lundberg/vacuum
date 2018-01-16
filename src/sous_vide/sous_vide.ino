@@ -123,8 +123,7 @@ void setup() {
     oled.clear();
     oled.set2X();
     oled.println("Booting");
-    oled.println("Sous Vide");
-    oled.println("2.0");
+    oled.println("Vacuum");
     oled.set1X();
 
     // Set up thermocouple
@@ -161,8 +160,7 @@ void setup() {
 
     delay(1400);
     oled.clear();
-
-    Serial.println("Sous Vide started");
+    Serial.println("Vacuum started");
 }
 
 void loop() {
@@ -415,7 +413,7 @@ void readSerialCommands() {
 }
 
 void printHelpSerial() {
-    Serial.println("Sous Vide commands:");
+    Serial.println("Vacuum commands:");
     Serial.println("  set SETTING VALUE - set the value of SETTING to VALUE");
     Serial.println("  get SETTING - get the current value of SETTING");
     Serial.println("  target [VALUE] - if VALUE is specified, set target to it; otherwise return current target");
