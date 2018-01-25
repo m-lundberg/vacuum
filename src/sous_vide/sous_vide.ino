@@ -38,7 +38,7 @@ const byte RIGHT = 2;
 const byte LEFT = 1;
 
 // SSR
-const int SSR = 13;  // TODO: change to 5
+const int SSR = 5;
 
 // Thermocouple (DS18B20)
 const int ds18b20 = 6;
