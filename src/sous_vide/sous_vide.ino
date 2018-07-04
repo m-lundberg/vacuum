@@ -14,10 +14,12 @@
 struct StoreStruct {
     double setpoint;
     double p, i, d;
+    bool ponm;
     char version[4];
 } settings = {
     50.0,
     40, 15, 10,
+    false,
     CONFIG_VERSION
 };
 
@@ -69,12 +71,16 @@ public:
         if (!inMenu) {
             return;
         }
-      
+
         oled.clear();
         
         for (int i = 0; i < menu.get_num_components(); ++i) {
             const MenuComponent* component = menu.get_menu_component(i);
             component->render(*this);
+
+            if (component->get_name() == "PonM") {
+                oled.print(settings.ponm ? ": On" : ": Off");
+            }
 
             if (component->is_current()) {
                 oled.print(" <<<");
@@ -110,6 +116,7 @@ Menu pidMenu("PID Settings");
 NumericMenuItem pItem("P", &onSelectedNumeric, settings.p, 0, 100);
 NumericMenuItem iItem("I", &onSelectedNumeric, settings.i, 0, 100);
 NumericMenuItem dItem("D", &onSelectedNumeric, settings.d, 0, 100);
+MenuItem togglePonmItem("PonM", &onSelected);
 BackMenuItem backItem("Back", &onSelected, &ms);
 
 void setup() {
@@ -154,6 +161,7 @@ void setup() {
     pidMenu.add_item(&pItem);
     pidMenu.add_item(&iItem);
     pidMenu.add_item(&dItem);
+    pidMenu.add_item(&togglePonmItem);
     pidMenu.add_item(&backItem);
     ms.get_root_menu().add_menu(&pidMenu);
     ms.get_root_menu().add_item(&backItem);
@@ -321,7 +329,7 @@ void onSelectedNumeric(MenuComponent* component) {
         settings.setpoint = ((NumericMenuItem*)component)->get_value();
     }
     
-    pid.SetTunings(settings.p, settings.i, settings.d);
+    pid.SetTunings(settings.p, settings.i, settings.d, settings.ponm ? P_ON_M : P_ON_E);
     saveConfig();
     ms.display();
 }
@@ -338,6 +346,10 @@ void onSelected(MenuComponent* component) {
         inMenu = false;
         ms.reset();
         oled.clear();
+    } else if (component->get_name() == togglePonmItem.get_name()) {
+        settings.ponm = !settings.ponm;
+        pid.SetTunings(settings.p, settings.i, settings.d, settings.ponm ? P_ON_M : P_ON_E);
+        saveConfig();
     }
 }
 
@@ -363,12 +375,14 @@ void readSerialCommands() {
                 settings.d = value.toFloat();
             } else if (setting == "setpoint" || setting == "target") {
                 settings.setpoint = value.toFloat();
+            } else if (setting == "ponm") {
+                settings.ponm = (value == "on" || value == "true");
             } else {
                 Serial.println("Unknown setting: " + setting);
             }
             Serial.println(value.toFloat());
 
-            pid.SetTunings(settings.p, settings.i, settings.d);
+            pid.SetTunings(settings.p, settings.i, settings.d, settings.ponm ? P_ON_M : P_ON_E);
             saveConfig();
             
         } else if (command.startsWith("get")) {
@@ -384,6 +398,8 @@ void readSerialCommands() {
                 Serial.println(settings.d);
             } else if (setting == "setpoint" || setting == "target") {
                 Serial.println(settings.setpoint);
+            } else if (setting == "ponm") {
+                Serial.println(settings.ponm ? "on" : "off");
             } else {
                 Serial.println("Unknown setting: " + setting);
             }
@@ -415,6 +431,12 @@ void readSerialCommands() {
 void printHelpSerial() {
     Serial.println("Vacuum commands:");
     Serial.println("  set SETTING VALUE - set the value of SETTING to VALUE");
+    Serial.println("    Available settings:");
+    Serial.println("      p:          float");
+    Serial.println("      i:          float");
+    Serial.println("      d:          float");
+    Serial.println("      setpoint:   float");
+    Serial.println("      ponm:       on/off  (proportional on measurement)");
     Serial.println("  get SETTING - get the current value of SETTING");
     Serial.println("  target [VALUE] - if VALUE is specified, set target to it; otherwise return current target");
     Serial.println("  on - turn heating on");
