@@ -23,6 +23,8 @@ struct StoreStruct {
     CONFIG_VERSION
 };
 
+bool loggingEnabled = false;
+
 // OLED Display
 SSD1306AsciiAvrI2c oled;
 
@@ -166,9 +168,8 @@ void setup() {
     ms.get_root_menu().add_menu(&pidMenu);
     ms.get_root_menu().add_item(&backItem);
 
-    delay(1400);
+    delay(600);
     oled.clear();
-    Serial.println("Vacuum started");
 }
 
 void loop() {
@@ -208,6 +209,7 @@ void loop() {
     }
 
     input = readTemp();
+    logTemp(input);
 
     if (heating) {
         pid.Compute();
@@ -363,10 +365,10 @@ void readSerialCommands() {
             // set - set a value for a setting
             int settingPos = command.indexOf(' ') + 1;
             int valuePos = command.indexOf(' ', settingPos) + 1;
-            
+
             String setting = command.substring(settingPos, valuePos-1);
             String value = command.substring(valuePos);
-            
+
             if (setting == "p") {
                 settings.p = value.toFloat();
             } else if (setting == "i") {
@@ -384,12 +386,12 @@ void readSerialCommands() {
 
             pid.SetTunings(settings.p, settings.i, settings.d, settings.ponm ? P_ON_M : P_ON_E);
             saveConfig();
-            
+
         } else if (command.startsWith("get")) {
             // get - get the value of a setting
             int settingPos = command.indexOf(' ') + 1;
             String setting = command.substring(settingPos);
-            
+
             if (setting == "p") {
                 Serial.println(settings.p);
             } else if (setting == "i") {
@@ -403,7 +405,7 @@ void readSerialCommands() {
             } else {
                 Serial.println("Unknown setting: " + setting);
             }
-            
+
         } else if (command.startsWith("target")) {
             int valuePos = command.indexOf(' ');
             if (valuePos == -1) {
@@ -413,6 +415,19 @@ void readSerialCommands() {
                 settings.setpoint = command.substring(valuePos+1).toFloat();
                 saveConfig();
             }
+
+        } else if (command.startsWith("log")) {
+            int settingPos = command.indexOf(' ');
+
+            if (settingPos == -1) {
+                // only entered "log", just toggle logging on/off
+                loggingEnabled = !loggingEnabled;
+            } else if (command.substring(settingPos+1) == "on") {
+                loggingEnabled = true;
+            } else if (command.substring(settingPos+1) == "off") {
+                loggingEnabled = false;
+            }
+            Serial.println("Logging " + String(loggingEnabled ? "enabled" : "disabled"));
 
         } else if (command.startsWith("on")) {
             Serial.println("Turning heating ON");
@@ -424,6 +439,20 @@ void readSerialCommands() {
 
         } else {
             printHelpSerial();
+        }
+    }
+}
+
+void logTemp(float currentTemp) {
+    static unsigned long lastLogTime = millis();
+
+    if (loggingEnabled) {
+        unsigned long currentTime = millis();
+
+        if (currentTime - lastLogTime > 1000) {
+            // log temperature value every second
+            Serial.println(String(currentTime) + " - " + String(currentTemp, 4));
+            lastLogTime = currentTime;
         }
     }
 }
@@ -441,6 +470,7 @@ void printHelpSerial() {
     Serial.println("  target [VALUE] - if VALUE is specified, set target to it; otherwise return current target");
     Serial.println("  on - turn heating on");
     Serial.println("  off - turn heating off");
+    Serial.println("  log [on/off] - toggle logging of temperature values every second on the form: [ms since boot] - [temp]");
     Serial.println("  help - show this help");
 }
 
